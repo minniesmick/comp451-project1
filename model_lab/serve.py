@@ -1,22 +1,30 @@
 """Model Lab sunucusu (isteğe bağlı): sonuç arayüzünü ve canlı tokenize / tahmin uçlarını yalnızca localhost'ta sunar.
 
 Kullanım (proje kökünden, run.sh bittikten sonra):
-  python serve.py            ->  http://127.0.0.1:8780
+  python model_lab/serve.py            ->  http://127.0.0.1:8780
 """
 import argparse
 import json
 import mimetypes
 import os
 import re
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+HERE = os.path.dirname(os.path.abspath(__file__))        # model_lab/ (ui)
+ROOT = os.path.dirname(HERE)                               # project root (models, outputs)
 MODELS = [("model1_char", "Model 1 · char"), ("model2_bpe", "Model 2 · BPE"), ("model3_distilbert", "Model 3 · DistilBERT")]
 STATIC_OK = re.compile(r"^(ui/[\w./-]+|outputs/[\w-]+\.json|models/[\w-]+/train_log\.json)$")
 _cache = {}
+_lock = threading.Lock()      # tek seferde yükle: eşzamanlı ilk istekler transformers içe aktarımında yarışır
 
 
 def _load():
+    with _lock:
+        return _load_locked()
+
+
+def _load_locked():
     if _cache:
         return _cache
     from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
@@ -81,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps([{"key": k, "title": t, "ready": os.path.isdir(os.path.join(ROOT, "models", k))} for k, t in MODELS]).encode(), "application/json")
         if not STATIC_OK.match(path) or ".." in path:
             return self._send(404, b"not found", "text/plain")
-        full = os.path.join(ROOT, path)
+        full = os.path.join(HERE if path.startswith("ui/") else ROOT, path)
         if not os.path.isfile(full):
             return self._send(404, b"not found", "text/plain")
         ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
@@ -101,11 +109,19 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, json.dumps({"error": str(e)}).encode(), "application/json")
 
 
+def _safe_warm():
+    try:
+        _load()
+    except Exception as e:                       # modeller yoksa arayüz yine açılır
+        print(f"warm-up atlandı: {e}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8780)
     args = ap.parse_args()
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    threading.Thread(target=lambda: _safe_warm(), daemon=True).start()       # modelleri arka planda ısıt
     print(f"Model Lab: http://127.0.0.1:{args.port}  (yalnızca localhost)")
     srv.serve_forever()
 

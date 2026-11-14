@@ -1,8 +1,8 @@
 """Veri hazırlama: TweetEval (sentiment) tüm bölümleri birleştirilir, 250 örnek Dataset2 (test) olarak ayrılır,
-geri kalanı Dataset1 (eğitim; train.py bunun %85'ini eğitim, %15'ini doğrulama için kullanır) olur.
+geri kalanı Dataset1 (eğitim; src/train.py bunun %85'ini eğitim, %15'ini doğrulama için kullanır) olur.
 
 Kullanım:
-  python prepare_data.py --output_dir data --test_size 250 --seed 42
+  python tools/prepare_data.py --output_dir data --test_size 250 --seed 42
 """
 import argparse
 import random
@@ -10,7 +10,10 @@ from collections import Counter
 
 from datasets import load_dataset
 
-from common import ID2LABEL, write_json, write_jsonl
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib.common import ID2LABEL, write_json, write_jsonl
 
 
 def main():

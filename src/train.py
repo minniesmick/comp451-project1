@@ -6,7 +6,7 @@
 Tokenizer seçeneği: --tokenizer char (Model1) ya da bpe (Model2). Tokenizer yalnızca eğitim bölümünden öğrenilir.
 
 Kullanım:
-  python train.py --tokenizer char --model_save_path models/model1_char --dataset_path data/dataset1.jsonl --num_train_epoch 12
+  python src/train.py --tokenizer char --model_save_path models/model1_char --dataset_path data/dataset1.jsonl --num_train_epoch 12
 """
 import argparse
 import json
@@ -15,8 +15,10 @@ import os
 import torch
 from transformers import BertConfig, BertForMaskedLM, BertForSequenceClassification, DataCollatorForLanguageModeling
 
-from common import ID2LABEL, LABEL2ID, LABELS, get_device, read_jsonl, seed_everything, split_train_val, train_classifier, write_json
-from custom_tokenizers import BUILDERS
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))   # proje kökü: lib/ paketi
+from lib.common import ID2LABEL, LABEL2ID, LABELS, get_device, read_jsonl, seed_everything, split_train_val, train_classifier, write_json
+from lib.custom_tokenizers import BUILDERS
 
 
 def pretrain_mlm(tokenizer, texts, config_kwargs, max_len, epochs, batch_size, lr, save_path, seed):

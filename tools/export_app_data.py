@@ -1,5 +1,5 @@
 """Uygulama (turkish-wordnet-ui) "Proje 1" sekmesi için küçük bir json üretir: ölçütler, eğitim eğrileri, mimari bilgisi,
-dört örnek tweet'in üç tokenizer ile parçalanışı. Kullanım: python export_app_data.py --out ../turkish-wordnet-ui/static/proj1/data.json
+dört örnek tweet'in üç tokenizer ile parçalanışı. Kullanım: python tools/export_app_data.py --out ../turkish-wordnet-ui/static/proj1/data.json
 """
 import argparse
 import json
@@ -7,7 +7,9 @@ import os
 
 from transformers import AutoTokenizer
 
-from common import read_jsonl, write_json
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib.common import read_jsonl, write_json
 
 KEYS = ["model1_char", "model2_bpe", "model3_distilbert"]
 

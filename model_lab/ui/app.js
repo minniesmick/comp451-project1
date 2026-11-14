@@ -12,6 +12,7 @@ const h = (tag, attrs = {}, ...kids) => {
     if (k === "class") el.className = v;
     else if (k === "style") el.setAttribute("style", v);
     else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k.startsWith("aria-") || k.startsWith("data-")) { if (v != null) el.setAttribute(k, String(v)); }
     else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
   }
   for (const k of kids.flat()) if (k != null) el.append(k.nodeType ? k : document.createTextNode(k));
@@ -20,6 +21,13 @@ const h = (tag, attrs = {}, ...kids) => {
 const f2 = (x) => (x == null ? "–" : x.toFixed(3));
 const getJSON = (url) => fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(url))));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+$("#theme").addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = (root.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("theme", root.dataset.theme); } catch (e) {}
+});
 
 const state = { summary: null, outs: {}, logs: {}, ready: false };
 
@@ -35,6 +43,7 @@ async function load() {
 
 const emptyBox = () => h("div", { class: "box empty" }, "No results yet. Run ", h("code", {}, "bash run.sh"), " first, then reload.");
 const modelDot = (m) => h("span", { class: "dot", style: `background:${m.color}` });
+const rankLabel = (m) => h("span", { class: "rl" }, modelDot(m), h("b", {}, m.short), h("small", {}, m.name));
 const modelLabel = (m) => h("span", {}, modelDot(m), `${m.short} · ${m.name}`);
 
 // ───────────────────────── Compare
@@ -48,14 +57,10 @@ function renderCompare(root) {
   root.append(
     h("h2", {}, `Results on ${n} held-out tweets`),
     h("p", { class: "lede" }, "Same test set, same metrics, three models. Models 1 and 2 are small transformers trained from scratch on the training split; Model 3 starts from a pretrained checkpoint and is fine-tuned."),
-    h("div", { class: "winner" }, h("b", { class: "num" }, best.t.macro_f1.toFixed(3)), h("span", {}, modelLabel(best.m), ` has the best macro-F1, ${(best.t.macro_f1 - second.t.macro_f1).toFixed(3)} ahead of ${second.m.short}.`)),
+    h("p", { class: "finding" }, modelLabel(best.m), " leads on macro-F1 at ", h("span", { class: "num" }, best.t.macro_f1.toFixed(3)), `, ${(best.t.macro_f1 - second.t.macro_f1).toFixed(3)} ahead of ${second.m.short}.`,
+      best.t.macro_f1 - second.t.macro_f1 < 0.02 ? ` With ${n} tweets that gap is within noise.` : ""),
   );
-  const legend = h("div", { class: "legend" }, MODELS.map((m) => h("span", {}, modelLabel(m))));
-  const overall = h("div", { class: "box" }, h("h3", {}, "Overall"), legend);
-  for (const [key, title] of [["accuracy", "Accuracy"], ["macro_f1", "Macro-F1"], ["weighted_f1", "Weighted-F1"]]) overall.append(group(title, stats.map((s) => [s.m, s.t[key]])));
-  const perClass = h("div", { class: "box" }, h("h3", {}, "F1 per class"), h("div", { class: "legend" }, MODELS.map((m) => h("span", {}, modelLabel(m)))));
-  for (const c of CLASSES) perClass.append(group(`${c} (n=${stats[0].t.per_class[c].support})`, stats.map((s) => [s.m, s.t.per_class[c].f1])));
-  root.append(rankBox(), h("div", { class: "grid g2" }, overall, perClass));
+  root.append(h("div", { class: "grid g2", style: "margin-bottom:28px" }, rankBox(), classPlot()), metricsBox(stats));
 
   const tbl = h("table", {}, h("thead", {}, h("tr", {}, ["Model", "Tokenizer", "Weights", "Parameters", "Epochs", "Best val F1", "Inference"].map((t, i) => h("th", { class: i > 2 ? "n" : "" }, t)))));
   const body = h("tbody");
@@ -67,18 +72,18 @@ function renderCompare(root) {
   }
   tbl.append(body);
   root.append(h("div", { class: "box", style: "margin-top:20px" }, h("h3", {}, "Setup"), tbl));
-  requestAnimationFrame(() => requestAnimationFrame(() => root.querySelectorAll(".fill").forEach((f) => (f.style.width = f.dataset.w))));
+  requestAnimationFrame(() => requestAnimationFrame(() => root.querySelectorAll(".pt").forEach((p) => (p.style.left = p.dataset.left))));
 }
 // Ranking: pick a metric, bars re-order (FLIP-style) and numbers count up
 const RANK_METRICS = [["accuracy", "Accuracy", (t) => t.accuracy], ["macro_f1", "Macro-F1", (t) => t.macro_f1], ["weighted_f1", "Weighted-F1", (t) => t.weighted_f1],
   ["negative", "F1 negative", (t) => t.per_class.negative.f1], ["neutral", "F1 neutral", (t) => t.per_class.neutral.f1], ["positive", "F1 positive", (t) => t.per_class.positive.f1]];
 function rankBox() {
-  const ROW = 46;
+  const ROW = matchMedia("(max-width: 720px)").matches ? 74 : 54;
   let metric = RANK_METRICS[1];
   const rows = {};
   const stage = h("div", { class: "rank", style: `height:${ROW * MODELS.length}px` });
   for (const m of MODELS) {
-    rows[m.key] = { shown: 0, el: h("div", { class: "rank-row", style: `height:${ROW - 8}px` }, h("span", { class: "rank-n" }), h("span", {}, modelLabel(m)),
+    rows[m.key] = { shown: 0, el: h("div", { class: "rank-row", style: `height:${ROW - 8}px` }, h("span", { class: "rank-n" }), rankLabel(m),
       h("div", { class: "track" }, h("div", { class: "fill", style: `background:${m.color}` })), h("b", { class: "v" }, "0.000")) };
     stage.append(rows[m.key].el);
   }
@@ -101,12 +106,41 @@ function rankBox() {
   const seg = h("div", { class: "seg", role: "group", "aria-label": "Metric" }, RANK_METRICS.map((mt) => h("button", { "aria-pressed": mt === metric, onclick: (e) => {
     metric = mt; seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b === e.currentTarget)); layout(); } }, mt[1])));
   requestAnimationFrame(() => requestAnimationFrame(layout));
-  return h("div", { class: "box", style: "margin-bottom:20px" }, h("div", { class: "box-head" }, h("h3", {}, "Ranking"), seg), stage);
+  return h("div", { class: "box" }, h("div", { class: "box-head" }, h("h3", {}, "Ranking"), seg), stage);
 }
-function group(title, rows) {
-  const g = h("div", { class: "metric-group" }, h("h4", {}, title));
-  for (const [m, v] of rows) g.append(h("div", { class: "metric-row" }, h("span", {}, m.short), h("div", { class: "track" }, h("div", { class: "fill", style: `background:${m.color}`, "data-w": `${(v * 100).toFixed(1)}%` })), h("span", { class: "v" }, f2(v))));
-  return g;
+// per-class F1 as a dot plot: one row per class, one dot per model, ring on the best
+function classPlot() {
+  const lo = 0.4, hi = 0.85, at = (v) => `${(((v - lo) / (hi - lo)) * 100).toFixed(2)}%`;
+  const ticks = [0.5, 0.6, 0.7, 0.8];
+  const grid = ticks.map((t) => `linear-gradient(var(--line), var(--line)) ${at(t)} 0 / 1px 100% no-repeat`).join(", ");
+  const rows = CLASSES.map((c) => {
+    const vals = MODELS.map((m) => ({ m, v: state.outs[m.key].metrics.per_class[c].f1 })), top = Math.max(...vals.map((x) => x.v)), min = Math.min(...vals.map((x) => x.v));
+    const track = h("div", { class: "dot-track", style: `background:${grid}` }, h("i", { class: "span", style: `left:${at(min)};width:calc(${at(top)} - ${at(min)})` }));
+    vals.forEach(({ m, v }, i) => {
+      const text = `${m.short} · ${m.name}: ${f2(v)}`;
+      const pt = h("button", { class: `pt${v === top ? " top" : ""}`, type: "button", style: `--c:${m.color};--d:${i * 70}ms`, "data-left": at(v), "aria-label": `${c}, ${text}` });
+      pt.addEventListener("pointerenter", (e) => showTip([h("div", {}, h("span", { class: "dot", style: `background:${m.color}` }), text)], e.clientX, e.clientY));
+      pt.addEventListener("pointermove", (e) => showTip([h("div", {}, h("span", { class: "dot", style: `background:${m.color}` }), text)], e.clientX, e.clientY));
+      pt.addEventListener("pointerleave", hideTip);
+      pt.addEventListener("focus", () => { const r = pt.getBoundingClientRect(); showTip([h("div", {}, text)], r.left + r.width / 2, r.top); });
+      pt.addEventListener("blur", hideTip);
+      track.append(pt);
+    });
+    return h("div", { class: "dot-row" }, h("div", { class: "lab" }, c, h("small", {}, `n=${state.outs[MODELS[0].key].metrics.per_class[c].support}`)), track);
+  });
+  const axis = h("div", { class: "dot-axis" }, ticks.map((t) => h("span", { style: `left:${at(t)}` }, t.toFixed(1))));
+  return h("div", { class: "box" }, h("div", { class: "box-head" }, h("h3", {}, "F1 per class")), h("div", { class: "legend" }, MODELS.map((m) => h("span", {}, modelLabel(m)))),
+    h("div", { class: "dots" }, rows, axis), h("p", { class: "dot-note" }, "Ring marks the best model in each class. Hover or focus a dot for its value."));
+}
+// every metric for every model in one table; the best value per row is bold
+function metricsBox(stats) {
+  const rows = [["Accuracy", (t) => t.accuracy], ["Macro-F1", (t) => t.macro_f1], ["Weighted-F1", (t) => t.weighted_f1]];
+  const classRows = CLASSES.map((c) => [`${c} (n=${stats[0].t.per_class[c].support})`, (t) => t.per_class[c].f1]);
+  const tr = ([label, get]) => { const vals = stats.map((s) => get(s.t)), top = Math.max(...vals);
+    return h("tr", {}, h("td", { class: "k" }, label), vals.map((v) => h("td", { class: `n${v === top ? " best" : ""}` }, f2(v)))); };
+  const body = h("tbody", {}, rows.map(tr), h("tr", { class: "grp" }, h("td", { colspan: 4 }, "F1 per class")), classRows.map(tr));
+  const head = h("thead", {}, h("tr", {}, h("th"), MODELS.map((m) => h("th", { class: "mh" }, modelDot(m), m.short))));
+  return h("div", { class: "box", style: "margin-bottom:20px" }, h("h3", {}, "All metrics"), h("table", { class: "mt" }, head, body));
 }
 
 // ───────────────────────── line chart helper
@@ -135,7 +169,7 @@ function lineChart({ series, yMin, yMax, yTicks, xMax, yFmt = (v) => v.toFixed(2
   }
   const step = xMax > 12 ? 2 : 1;
   for (let x = 1; x <= xMax; x += step) { const t = s("text", { x: X(x), y: H - 8, "text-anchor": "middle" }); t.textContent = x; gGrid.append(t); }
-  const lbl = s("text", { x: W - R, y: H - 8, "text-anchor": "end" }); lbl.textContent = "epoch"; gGrid.append(lbl);
+  const lbl = s("text", { x: L - 10, y: H - 8, "text-anchor": "end" }); lbl.textContent = "epoch"; gGrid.append(lbl);
   svg.append(gGrid);
   const hover = s("line", { class: "hover-line", y1: T, y2: H - B, opacity: 0 });
   svg.append(hover);
@@ -143,7 +177,8 @@ function lineChart({ series, yMin, yMax, yTicks, xMax, yFmt = (v) => v.toFixed(2
     const d = sr.points.map((p, i) => `${i ? "L" : "M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
     const path = s("path", { d, class: `path${sr.dash ? " dash" : ""}`, stroke: sr.color });
     svg.append(path);
-    if (!reduce && !sr.dash) { const len = Math.ceil(sr.points.length * 90); path.style.setProperty("--len", len); path.classList.add("draw"); }
+    if (!reduce && !sr.dash) { path.setAttribute("pathLength", "1"); path.style.setProperty("--len", 1); path.classList.add("draw"); }   // normalised length: the draw-on animation always covers the whole line
+    if (sr.points.length <= 4 && !sr.dash) for (const p of sr.points) svg.append(s("circle", { class: "pt-dot", cx: X(p.x), cy: Y(p.y), r: 3.5, fill: sr.color }));
     if (sr.best != null) { const p = sr.points.find((q) => q.x === sr.best); if (p) svg.append(s("circle", { class: "best", cx: X(p.x), cy: Y(p.y), r: 5, fill: sr.color })); }
   }
   const wrap = h("div", { class: "chart" }, svg);
@@ -191,11 +226,12 @@ function renderTrain(root) {
   if (mlm.length) {
     const mx = Math.max(...mlm.map((x) => x.lg.mlm_history.length));
     const ys = mlm.flatMap((x) => x.lg.mlm_history.map((e) => e.mlm_loss));
-    root.append(h("div", { class: "box", style: "margin-top:20px" }, h("h3", {}, "Language-model pretraining (masked tokens, from scratch)"),
-      h("p", { class: "muted", style: "margin:0 0 10px" }, "Lower loss means the model predicts hidden tokens better. Token vocabularies differ, so compare the shapes, not the absolute values."),
-      h("div", { class: "legend" }, mlm.map(({ m }) => h("span", {}, modelLabel(m)))),
+    const chart = h("div", { class: "box" }, h("h3", {}, "Masked-token pretraining loss"), h("div", { class: "legend" }, mlm.map(({ m }) => h("span", {}, modelLabel(m)))),
       lineChart({ title: "MLM loss by epoch", yMin: Math.floor(Math.min(...ys) * 2) / 2, yMax: Math.ceil(Math.max(...ys) * 2) / 2, yTicks: 4, xMax: mx,
-        series: mlm.map(({ m, lg }) => ({ name: m.short, color: m.color, points: lg.mlm_history.map((e) => ({ x: e.epoch, y: e.mlm_loss })) })) })));
+        series: mlm.map(({ m, lg }) => ({ name: m.short, color: m.color, points: lg.mlm_history.map((e) => ({ x: e.epoch, y: e.mlm_loss })) })) }));
+    const note = h("div", { class: "box" }, h("h3", {}, "Why only two models"), h("p", { class: "note" }, "Models 1 and 2 start with random weights, so they first learn language by predicting hidden tokens, then learn sentiment. Model 3 already knows English and skips this step."),
+      h("p", { class: "note" }, "A lower loss means better guesses at the hidden tokens. The two vocabularies differ (characters against subwords), so compare the shape of the curves, not the absolute values."));
+    root.append(h("div", { class: "grid g2", style: "margin-top:20px" }, chart, note));
   }
 }
 
@@ -227,7 +263,8 @@ function renderTokens(root) {
   const err = h("div", { class: "err", role: "alert" });
   const run = async (text, btn) => {
     if (!text.trim()) return;
-    btn.disabled = true; err.textContent = "";
+    btn.disabled = true; err.textContent = ""; err.classList.remove("info");
+    const slow = setTimeout(() => { err.classList.add("info"); err.textContent = "Loading the models. The first request takes a few seconds…"; }, 600);
     try {
       const data = await api("/api/tokenize", text);
       out.replaceChildren(...MODELS.filter((m) => data[m.key]).map((m) => {
@@ -237,6 +274,7 @@ function renderTokens(root) {
         return h("div", { class: "tokrow" }, h("div", { class: "head" }, modelLabel(m), h("span", { class: "num" }, `${d.count} tokens`)), row);
       }));
     } catch (e) { err.textContent = `Could not tokenize: ${e.message}. Is serve.py running with trained models?`; }
+    clearTimeout(slow); err.classList.remove("info"); if (err.textContent.startsWith("Loading the models")) err.textContent = "";
     btn.disabled = false;
   };
   const ib = inputBlock(run, "Type a tweet…", "Tokenize");
@@ -252,7 +290,8 @@ function renderLive(root) {
   const err = h("div", { class: "err", role: "alert" });
   const run = async (text, btn, gold) => {
     if (!text.trim()) return;
-    btn.disabled = true; err.textContent = "";
+    btn.disabled = true; err.textContent = ""; err.classList.remove("info");
+    const slow = setTimeout(() => { err.classList.add("info"); err.textContent = "Loading the models. The first request takes a few seconds…"; }, 600);
     try {
       const data = await api("/api/predict", text);
       const rows = MODELS.filter((m) => data[m.key]).map((m) => {
@@ -264,6 +303,7 @@ function renderLive(root) {
       out.replaceChildren(h("div", { class: "box-head" }, h("h3", {}, "Predicted probabilities"), gold ? h("span", { class: "muted" }, "Gold label: ", h("span", { class: `badge ${gold}` }, gold)) : null), ...rows);
       requestAnimationFrame(() => requestAnimationFrame(() => out.querySelectorAll("i[data-w]").forEach((i) => (i.style.width = i.dataset.w))));
     } catch (e) { err.textContent = `Could not predict: ${e.message}. Is serve.py running with trained models?`; }
+    clearTimeout(slow); err.classList.remove("info"); if (err.textContent.startsWith("Loading the models")) err.textContent = "";
     btn.disabled = false;
   };
   const ib = inputBlock(run, "Type a tweet…", "Predict");
@@ -300,7 +340,7 @@ function matrixBox(m) {
     style: `--a:${(v / max).toFixed(2)}`, "data-ok": i === j, "aria-pressed": sel(i, j), "aria-label": `${m.short}: gold ${CLASSES[i]}, predicted ${CLASSES[j]}: ${v}`,
     onclick: () => { view.cell = sel(i, j) ? null : { k: m.key, i, j }; drawErrors(); } }, v))))));
   table.append(body);
-  return h("div", { class: "box", style: `border-top:3px solid ${m.color}` }, h("h3", {}, modelLabel(m)), table,
+  return h("div", { class: "box" }, h("h3", {}, modelLabel(m)), table,
     h("p", { class: "axis-note" }, h("b", { class: "num" }, f2(o.metrics.accuracy)), " accuracy · ", h("b", { class: "num" }, f2(o.metrics.macro_f1)), " macro-F1"));
 }
 function agreementBar(items) {
@@ -348,6 +388,7 @@ function show(tab) {
   if (tab === "compare" || tab === "train" || !rendered.has(tab)) renderers[tab](root);   // charts re-animate on each visit
   rendered.add(tab);
   try { history.replaceState(null, "", `#${tab}`); } catch {}
+  if (typeof moveInk === "function") moveInk();
 }
 document.querySelector(".tabs").addEventListener("click", (e) => { const b = e.target.closest("[role=tab]"); if (b) show(b.dataset.tab); });
 document.querySelector(".tabs").addEventListener("keydown", (e) => {
@@ -356,4 +397,15 @@ document.querySelector(".tabs").addEventListener("keydown", (e) => {
   const nx = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; nx.focus(); show(nx.dataset.tab);
 });
 await load();
-show(location.hash.slice(1) in renderers ? location.hash.slice(1) : "compare");
+const nav = document.querySelector(".tabs"), ink = nav.querySelector(".ink");
+function moveInk() {
+  const on = nav.querySelector('[aria-selected="true"]');
+  if (!on) return;
+  ink.style.width = `${on.offsetWidth}px`;
+  ink.style.transform = `translateX(${on.offsetLeft}px)`;
+}
+new ResizeObserver(moveInk).observe(nav);
+document.fonts?.ready.then(() => { moveInk(); requestAnimationFrame(() => ink.classList.add("ready")); });
+const fromHash = () => (location.hash.slice(1) in renderers ? location.hash.slice(1) : "compare");
+show(fromHash());
+addEventListener("hashchange", () => show(fromHash()));

@@ -4,14 +4,16 @@ SST-2 başlığı 2 sınıflıdır (negatif/pozitif); veri 3 sınıflı (negativ
 sınıflandırma başlığı 3 çıkışla yeniden başlatılır (ignore_mismatched_sizes). Gövde ve WordPiece tokenizer hazır gelir.
 
 Kullanım:
-  python fine_tune.py --model_save_path models/model3_distilbert --dataset_path data/dataset1.jsonl --num_train_epoch 3
+  python src/fine_tune.py --model_save_path models/model3_distilbert --dataset_path data/dataset1.jsonl --num_train_epoch 3
 """
 import argparse
 import os
 
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from common import ID2LABEL, LABEL2ID, LABELS, read_jsonl, seed_everything, split_train_val, train_classifier, write_json
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))   # proje kökü: lib/ paketi
+from lib.common import ID2LABEL, LABEL2ID, LABELS, read_jsonl, seed_everything, split_train_val, train_classifier, write_json
 
 
 def main():

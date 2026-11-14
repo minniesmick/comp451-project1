@@ -1,8 +1,8 @@
-"""Teslim zip'i: kod + script + veri + sonuçlar + rapor (model ağırlıkları ve .venv hariç). Kullanım: python make_zip.py"""
+"""Teslim zip'i: kod + script + veri + sonuçlar + rapor (model ağırlıkları ve .venv hariç). Kullanım: python tools/make_zip.py"""
 import os
 import zipfile
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import sys
 WITH_MODELS = "--with_models" in sys.argv          # kayıtlı model ağırlıklarını da koy (~270 MB)
 SKIP_DIRS = {".venv", "__pycache__", ".git", ".cache", ".claude"} | (set() if WITH_MODELS else {"models"})

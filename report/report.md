@@ -1,5 +1,7 @@
 # COMP 451 Project#1 — English Tweet Sentiment Analysis
 
+MEF University · Fall 2026 · Instructor: Dr. Demir · Student: Alper Yusuf Yaman
+
 **Task.** Three-class sentiment (negative / neutral / positive) on TweetEval-sentiment tweets. **Data.** All TweetEval sentiment splits were pooled and exact duplicate texts removed (29). 250 stratified samples form Dataset2 (test, never used for training or model selection); the remaining 59,620 form Dataset1, of which 85 % trains and 15 % validates (best epoch chosen by validation macro-F1). TweetEval was chosen deliberately: Model 3's checkpoint was fine-tuned on SST-2 movie reviews, so tweets avoid train/test leakage.
 
 ## Models
@@ -16,9 +18,9 @@ Models 1 and 2 are trained from scratch in plain PyTorch (AdamW, linear warm-up/
 
 ```
 pip install -r requirements.txt
-bash run.sh        # data -> train.py x2 -> fine_tune.py -> pipeline.py x3 -> compare.py
+bash run.sh        # data -> src/train.py x2 -> src/fine_tune.py -> src/pipeline.py x3 -> tools/compare.py
 ```
-Everything uses relative paths. Single steps and arguments (`--model_save_path --dataset_path --num_train_epoch --model_load_path --input_file --output_file`) are listed in `README.md`. `pipeline.py` uses the Hugging Face `pipeline("text-classification")` and writes predictions plus metrics to `outputs/<model>.json`; `compare.py` builds `outputs/summary.md`. Optional: `python serve.py` opens a local results UI (curves, tokenizer view, live prediction).
+Everything uses relative paths. Single steps and arguments (`--model_save_path --dataset_path --num_train_epoch --model_load_path --input_file --output_file`) are listed in `README.md`. `src/pipeline.py` uses the Hugging Face `pipeline("text-classification")` and writes predictions plus metrics to `outputs/<model>.json`; `tools/compare.py` builds `outputs/summary.md`. Optional: `python model_lab/serve.py` opens a local results UI (curves, tokenizer view, live prediction).
 
 ## Results on Dataset2 (250 tweets)
 

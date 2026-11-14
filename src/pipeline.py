@@ -1,7 +1,7 @@
 """Hugging Face Pipeline API ile kayıtlı bir modeli Dataset2 (test) üzerinde çalıştırır; tahminleri ve ölçütleri json'a yazar.
 
 Kullanım:
-  python pipeline.py --model_load_path models/model1_char --input_file data/dataset2_test.jsonl --output_file outputs/model1_char.json
+  python src/pipeline.py --model_load_path models/model1_char --input_file data/dataset2_test.jsonl --output_file outputs/model1_char.json
 """
 import argparse
 import os
@@ -9,7 +9,9 @@ import time
 
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
-from common import LABEL2ID, LABELS, compute_metrics, get_device, read_jsonl, write_json
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))   # proje kökü: lib/ paketi
+from lib.common import LABEL2ID, LABELS, compute_metrics, get_device, read_jsonl, write_json
 
 
 def main():

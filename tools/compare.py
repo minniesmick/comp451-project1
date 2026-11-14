@@ -1,12 +1,14 @@
 """Üç modelin pipeline çıktılarını (ve eğitim günlüklerini) tek bir özet dosyada toplar: outputs/summary.json ve outputs/summary.md.
 
 Kullanım:
-  python compare.py --outputs_dir outputs --models_dir models
+  python tools/compare.py --outputs_dir outputs --models_dir models
 """
 import argparse
 import os
 
-from common import read_jsonl, write_json
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lib.common import read_jsonl, write_json
 
 MODELS = [("model1_char", "Model1 (char tokenizer, sıfırdan)"), ("model2_bpe", "Model2 (BPE tokenizer, sıfırdan)"), ("model3_distilbert", "Model3 (DistilBERT, ince ayar)")]
 

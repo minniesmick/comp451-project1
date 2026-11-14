@@ -5,30 +5,36 @@
 # Eğitimi atlayıp yalnızca kayıtlı modellerle pipeline çalıştırmak için:  bash run_pipeline.sh
 set -euo pipefail
 cd "$(dirname "$0")"
-PYTHON=${PYTHON:-python}
+# Python yorumlayıcısı: PYTHON verilmediyse çalışan ilk python3 / python seçilir (macOS'ta yalnızca python3 olur)
+if [ -z "${PYTHON:-}" ]; then
+  for c in python3 python; do
+    if "$c" -c "import sys" >/dev/null 2>&1; then PYTHON=$c; break; fi
+  done
+fi
+: "${PYTHON:?python bulunamadi, PYTHON=/yol/python bash run.sh ile verin}"
 EPOCHS=${EPOCHS:-12}; FT_EPOCHS=${FT_EPOCHS:-3}; MLM_EPOCHS=${MLM_EPOCHS:-15}; MAX_TRAIN=${MAX_TRAIN:-0}   # 0 = tüm veri
 
 # 0) veri (yoksa indir, Dataset1 + Dataset2 üret)
 if [ ! -f data/dataset1.jsonl ]; then
-  $PYTHON prepare_data.py --output_dir "data" --test_size 250
+  $PYTHON tools/prepare_data.py --output_dir "data" --test_size 250
 fi
 
 # 1) Model1: karakter düzeyi tokenizer, sıfırdan transformer
-$PYTHON train.py \
+$PYTHON src/train.py \
   --tokenizer "char" \
   --model_save_path "models/model1_char" \
   --dataset_path "data/dataset1.jsonl" \
   --num_train_epoch "$EPOCHS" --mlm_epochs "$MLM_EPOCHS" --max_train_samples "$MAX_TRAIN"
 
 # 2) Model2: BPE (alt sözcük) tokenizer, sıfırdan transformer
-$PYTHON train.py \
+$PYTHON src/train.py \
   --tokenizer "bpe" \
   --model_save_path "models/model2_bpe" \
   --dataset_path "data/dataset1.jsonl" \
   --num_train_epoch "$EPOCHS" --mlm_epochs "$MLM_EPOCHS" --max_train_samples "$MAX_TRAIN"
 
 # 3) Model3: hazır DistilBERT SST-2 modeline ince ayar
-$PYTHON fine_tune.py \
+$PYTHON src/fine_tune.py \
   --model_save_path "models/model3_distilbert" \
   --dataset_path "data/dataset1.jsonl" \
   --num_train_epoch "$FT_EPOCHS" --max_train_samples "$MAX_TRAIN"
