@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+models/
+outputs/*.json
+outputs/*.md
+data/*.jsonl
+.cache/
+*.zip
+PRODUCT.md
+report/report.html
+outputs/run.log

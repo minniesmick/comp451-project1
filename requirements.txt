@@ -1,0 +1,7 @@
+# Tested with Python 3.11 on Windows 11 (RTX 3060 Ti, CUDA 12.4); also runs on CPU (slow)
+torch==2.6.0
+transformers==5.23.0
+datasets==5.2.0
+tokenizers==0.23.3
+scikit-learn==1.9.0
+numpy==2.4.4

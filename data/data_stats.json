@@ -1,0 +1,22 @@
+{
+  "source": "cardiffnlp/tweet_eval/sentiment",
+  "seed": 42,
+  "pooled_examples": 59899,
+  "duplicates_removed": 29,
+  "dataset1_train_pool": {
+    "size": 59620,
+    "labels": {
+      "negative": 11328,
+      "positive": 20946,
+      "neutral": 27346
+    }
+  },
+  "dataset2_test": {
+    "size": 250,
+    "labels": {
+      "neutral": 115,
+      "negative": 47,
+      "positive": 88
+    }
+  }
+}
