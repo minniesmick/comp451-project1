@@ -365,7 +365,7 @@ function listBox(items) {
     list.append(h("div", { class: "row3" }, h("div", { class: "t" }, it.text), h("span", { class: `badge ${it.gold}` }, it.gold),
       h("div", { class: "votes" }, MODELS.map((x, i) => h("span", { class: `vote ${it.per[i].correct ? "ok" : "bad"}`, title: `${x.short}: ${it.per[i].predicted} (${(it.per[i].confidence * 100).toFixed(0)}%)` }, h("i", { style: `background:${x.color}` }), it.per[i].predicted.slice(0, 3), h("small", {}, `${(it.per[i].confidence * 100).toFixed(0)}`))))));
   }
-  return h("div", { class: "box" }, h("div", { class: "box-head" }, h("h3", {}, `${rows.length} tweets`), modes), chips.length ? h("div", { class: "chips", style: "margin-bottom:10px" }, chips) : null, list);
+  return h("div", { class: "box" }, h("div", { class: "box-head" }, h("h3", {}, `${rows.length} ${rows.length === 1 ? "tweet" : "tweets"}`), modes), chips.length ? h("div", { class: "chips", style: "margin-bottom:10px" }, chips) : null, list);
 }
 function drawErrors() {
   const root = $("#tab-errors");

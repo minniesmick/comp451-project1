@@ -17,6 +17,7 @@
 ![Transformers](https://img.shields.io/badge/Transformers-5.23.0-ffbf00?style=flat-square)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-555?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-e0aaff?style=flat-square)](./LICENSE)
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/minniesmick/comp451-project1?utm_source=readme&utm_medium=badge)
 
 <br/>
 
