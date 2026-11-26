@@ -56,9 +56,11 @@ The task is three-class sentiment classification (negative / neutral / positive)
 |---|---|---|---|
 | Model1 | character-level, learned from the train split (462 symbols) | tiny BERT from scratch (MLM pretrain, then classification) | 1.9 M |
 | Model2 | ByteLevel BPE, vocab 8000, learned from the train split | same architecture, from scratch | 3.4 M |
-| Model3 | WordPiece (DistilBERT) | `distilbert-base-uncased-finetuned-sst-2-english`, fine-tuned, head re-initialised to 3 classes | 67.0 M |
+| Model3 | WordPiece (DistilBERT) | [`distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english), fine-tuned, head re-initialised to 3 classes | 67.0 M |
 
 The from-scratch models have 4 layers, hidden size 192, 4 attention heads and FFN size 768.
+
+Links: Model3 base checkpoint [distilbert/distilbert-base-uncased-finetuned-sst-2-english](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english) (Hugging Face Hub, downloaded on first run); Model1 and Model2 use the [BERT](https://arxiv.org/abs/1810.04805) architecture via [`BertForSequenceClassification`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertForSequenceClassification) and are trained here, so there is no hosted checkpoint; data from [cardiffnlp/tweet_eval](https://huggingface.co/datasets/cardiffnlp/tweet_eval).
 
 ## Results
 
@@ -88,6 +90,7 @@ BPE beats character-level tokens by about 8 macro-F1 points. Model2 and Model3 a
 - Compare tab: animated ranking of the three models.
 - Training tab: loss and F1 curves per epoch.
 - Tokenizers tab: see how each tokenizer splits a tweet.
+- Attention tab: the real attention weights of all three models for one tweet. Attention rollout shows which tokens feed the [CLS] vector the classifier reads; below it you pick a layer, a head and a token and see its attention row and the full matrix.
 - Try it tab: type a tweet or roll a random test tweet and see all three predictions.
 - Test set tab: three confusion matrices side by side and a per-tweet list with model votes.
 
@@ -192,7 +195,7 @@ Extra `src/train.py` options: `--mlm_epochs 15 --batch_size 64 --lr 5e-4 --hidde
 | 8780 | Model Lab (`model_lab/serve.py`), local only |
 
 - The Model Lab reads `outputs/*.json` and `models/*/train_log.json`, so run the pipeline first.
-- API routes: `GET /api/models`, `POST /api/predict`, `POST /api/tokenize`.
+- API routes: `GET /api/models`, `POST /api/predict`, `POST /api/tokenize`, `POST /api/attention`.
 - The frontend is plain ES modules in `model_lab/ui/`. Edit and reload, no build step.
 - Line endings: `.sh` files are forced to LF through `.gitattributes`, so they work on Linux and macOS.
 

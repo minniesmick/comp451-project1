@@ -56,9 +56,11 @@ Görev, TweetEval üzerinde üç sınıflı duygu sınıflandırmadır (negatif 
 |---|---|---|---|
 | Model1 | karakter düzeyi, eğitim bölümünden öğrenilir (462 sembol) | sıfırdan küçük BERT (MLM ön eğitim, sonra sınıflandırma) | 1,9 M |
 | Model2 | ByteLevel BPE, sözlük 8000, eğitim bölümünden öğrenilir | aynı mimari, sıfırdan | 3,4 M |
-| Model3 | WordPiece (DistilBERT) | `distilbert-base-uncased-finetuned-sst-2-english`, ince ayar, çıkış katmanı 3 sınıfa yeniden kuruldu | 67,0 M |
+| Model3 | WordPiece (DistilBERT) | [`distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english), ince ayar, çıkış katmanı 3 sınıfa yeniden kuruldu | 67,0 M |
 
 Sıfırdan modeller 4 katman, gizli boyut 192, 4 dikkat başı ve FFN boyutu 768 kullanır.
+
+Bağlantılar: Model3 taban kontrol noktası [distilbert/distilbert-base-uncased-finetuned-sst-2-english](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english) (Hugging Face Hub, ilk çalıştırmada indirilir); Model1 ve Model2 [BERT](https://arxiv.org/abs/1810.04805) mimarisini [`BertForSequenceClassification`](https://huggingface.co/docs/transformers/model_doc/bert#transformers.BertForSequenceClassification) ile kullanır ve burada eğitilir, yani barındırılan bir kontrol noktası yoktur; veri [cardiffnlp/tweet_eval](https://huggingface.co/datasets/cardiffnlp/tweet_eval).
 
 ## Sonuçlar
 
@@ -88,6 +90,7 @@ BPE, karakter düzeyine göre yaklaşık 8 macro-F1 puan öndedir. 250 örnekte 
 - Compare sekmesi: üç modelin animasyonlu sıralaması.
 - Training sekmesi: epoch başına kayıp ve F1 eğrileri.
 - Tokenizers sekmesi: her tokenizer'ın bir tweeti nasıl böldüğü.
+- Attention sekmesi: bir tweet için üç modelin gerçek dikkat ağırlıkları. Attention rollout sınıflandırıcının okuduğu [CLS] vektörünü hangi token'ların beslediğini gösterir; altta katman, kafa ve token seçip o token'ın dikkat satırını ve tüm matrisi görürsün.
 - Try it sekmesi: tweet yaz ya da rastgele test tweeti at, üç tahmini gör.
 - Test set sekmesi: yan yana üç karışıklık matrisi ve model oylarıyla tweet listesi.
 
@@ -192,7 +195,7 @@ python src/pipeline.py --model_load_path models/model1_char \
 | 8780 | Model Lab (`model_lab/serve.py`), yalnızca yerel |
 
 - Model Lab `outputs/*.json` ve `models/*/train_log.json` okur, önce akışı çalıştırın.
-- API rotaları: `GET /api/models`, `POST /api/predict`, `POST /api/tokenize`.
+- API rotaları: `GET /api/models`, `POST /api/predict`, `POST /api/tokenize`, `POST /api/attention`.
 - Ön yüz `model_lab/ui/` içinde sade ES modülleridir. Düzenleyip yenileyin, derleme yok.
 - Satır sonu: `.sh` dosyaları `.gitattributes` ile LF'ye zorlanır, Linux ve macOS'ta çalışır.
 

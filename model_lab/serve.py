@@ -35,23 +35,49 @@ def _load_locked():
         if not os.path.isdir(path):
             continue
         tok = AutoTokenizer.from_pretrained(path)
-        model = AutoModelForSequenceClassification.from_pretrained(path)
-        _cache[key] = {"title": title, "tok": tok, "max_len": min(model.config.max_position_embeddings, 512),
+        model = AutoModelForSequenceClassification.from_pretrained(path, attn_implementation="eager")   # eager: dikkat ağırlıkları döner
+        _cache[key] = {"title": title, "tok": tok, "model": model, "max_len": min(model.config.max_position_embeddings, 512),
                        "pipe": pipeline("text-classification", model=model, tokenizer=tok, device=device)}
     return _cache
+
+
+def _pieces(tok, ids):
+    toks = []
+    for t in tok.convert_ids_to_tokens(ids):
+        special = t in ("[CLS]", "[SEP]", "[PAD]")
+        ws = t.startswith("Ġ")                       # ByteLevel BPE: sözcük başı
+        piece = t[1:] if ws else t
+        toks.append({"t": piece, "ws": ws, "special": special, "cont": piece.startswith("##")})
+    return toks
 
 
 def tokenize(text):
     out = {}
     for key, m in _load().items():
         ids = m["tok"](text, truncation=True, max_length=m["max_len"])["input_ids"]
-        toks = []
-        for t in m["tok"].convert_ids_to_tokens(ids):
-            special = t in ("[CLS]", "[SEP]", "[PAD]")
-            ws = t.startswith("Ġ")                       # ByteLevel BPE: sözcük başı
-            piece = t[1:] if ws else t
-            toks.append({"t": piece, "ws": ws, "special": special, "cont": piece.startswith("##")})
+        toks = _pieces(m["tok"], ids)
         out[key] = {"title": m["title"], "count": len(toks), "tokens": toks}
+    return out
+
+
+def attention(text):
+    """Her model için belirteçler, tahmin olasılıkları ve ham dikkat ağırlıkları [katman][kafa][sorgu][anahtar]."""
+    import torch
+    out = {}
+    for key, m in _load().items():
+        tok, model = m["tok"], m["model"]
+        enc = tok(text, truncation=True, max_length=m["max_len"], return_tensors="pt")
+        if model.config.model_type == "distilbert":
+            enc.pop("token_type_ids", None)
+        enc = {k: v.to(model.device) for k, v in enc.items()}
+        with torch.no_grad():
+            res = model(**enc, output_attentions=True)
+        probs = torch.softmax(res.logits[0].float(), -1).cpu().tolist()
+        id2 = model.config.id2label
+        scores = {id2[i]: round(p, 4) for i, p in enumerate(probs)}
+        att = torch.stack([a[0] for a in res.attentions]).float().cpu().round(decimals=3).tolist()   # L x H x n x n
+        out[key] = {"title": m["title"], "tokens": _pieces(tok, enc["input_ids"][0].cpu().tolist()), "scores": scores,
+                    "label": max(scores, key=scores.get), "layers": len(att), "heads": len(att[0]), "attn": att}
     return out
 
 
@@ -97,14 +123,14 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, f.read(), ctype + ("; charset=utf-8" if ctype.startswith("text") or ctype.endswith("json") or ctype.endswith("javascript") else ""))
 
     def do_POST(self):
-        if self.path not in ("/api/predict", "/api/tokenize"):
+        if self.path not in ("/api/predict", "/api/tokenize", "/api/attention"):
             return self._send(404, b"not found", "text/plain")
         try:
             text = str(json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)) or 0))["text"])[:600]
             if not text.strip():
                 raise ValueError("empty")
-            data = predict(text) if self.path == "/api/predict" else tokenize(text)
-            self._send(200, json.dumps(data, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+            data = {"/api/predict": predict, "/api/tokenize": tokenize, "/api/attention": attention}[self.path](text)
+            self._send(200, json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode(), "application/json; charset=utf-8")
         except Exception as e:                                    # noqa: BLE001
             self._send(400, json.dumps({"error": str(e)}).encode(), "application/json")
 

@@ -310,3 +310,16 @@ main { padding-top: 40px; }
   .dot-row { grid-template-columns: 74px 1fr; } .dot-axis { left: 74px; }
   main { padding-top: 28px; }
 }
+
+/* attention */
+.tk.at { font: inherit; font-family: var(--mono); font-size: .8125rem; line-height: 1.2; color: var(--ink); border: 0; opacity: 1; animation: none; background: color-mix(in oklch, var(--c, var(--accent)) calc(var(--a) * 78%), var(--panel-2)); }
+button.tk.at { cursor: pointer; outline: 2px solid transparent; outline-offset: 1px; transition: outline-color .15s; }
+button.tk.at:hover { outline-color: var(--ink-3); }
+button.tk.at.sel { outline-color: var(--red); }
+.tk.at.sp { background: transparent; }
+.ctl { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.ctl > .muted { width: 42px; }
+.hm-wrap { margin-top: 20px; overflow-x: auto; }
+.hm svg { display: block; max-width: 100%; height: auto; cursor: pointer; }
+.hm .hl { fill: var(--ink-3); font-size: 10px; font-family: var(--mono); }
+.hm .hl.on { fill: var(--ink); font-weight: 700; }

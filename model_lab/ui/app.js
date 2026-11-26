@@ -325,6 +325,123 @@ function renderLive(root) {
   root.append(h("h2", {}, "Try the models"), h("p", { class: "lede" }, "All three saved models score the same text through the Hugging Face pipeline. Disagreement between them is the interesting part."), ib.node, err, out);
 }
 
+// ───────────────────────── Attention
+// /api/attention returns raw weights [layer][head][query][key] per model. Everything below (head mean, rollout, shading) is computed here.
+const att = { data: null, text: "", key: MODELS[2].key, layer: null, head: -1, q: 0 };
+const meanHeads = (d, l) => {
+  const H = d.attn[l], n = d.tokens.length, out = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (const m of H) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) out[i][j] += m[i][j] / H.length;
+  return out;
+};
+const weights = (d, l, hd) => (hd < 0 ? meanHeads(d, l) : d.attn[l][hd]);
+// attention rollout (Abnar & Zuidema 2020), CLS row only: v = e0 · A'_L · … · A'_1 with A' = ½A + ½I
+function rollout(d) {
+  const n = d.tokens.length;
+  let v = new Array(n).fill(0); v[0] = 1;
+  for (let l = d.layers - 1; l >= 0; l--) {
+    const A = meanHeads(d, l), nv = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) { if (!v[i]) continue; for (let j = 0; j < n; j++) nv[j] += v[i] * (0.5 * A[i][j] + (i === j ? 0.5 : 0)); }
+    v = nv;
+  }
+  return v;
+}
+const tokText = (t) => (t.ws ? " " : "") + t.t;
+function shadedTokens(d, vals, { color, onpick, sel }) {
+  const real = d.tokens.map((t, i) => (t.special ? 0 : vals[i]));
+  const max = Math.max(...real, 1e-9);
+  const row = h("div", { class: "toks", style: `--c:${color}` });
+  d.tokens.forEach((t, i) => {
+    const a = t.special ? 0 : Math.min(1, vals[i] / max);
+    const el = h(onpick ? "button" : "span", { class: `tk at${t.ws ? " ws" : ""}${t.special ? " sp" : ""}${sel === i ? " sel" : ""}`, style: `--a:${a.toFixed(3)}`, "data-i": i,
+      title: `${t.t}  ·  ${vals[i].toFixed(3)}`, ...(onpick ? { type: "button", "aria-pressed": sel === i } : {}) }, t.t);
+    if (onpick) el.addEventListener("click", () => onpick(i));
+    row.append(el);
+  });
+  return row;
+}
+function summaryBox(data) {
+  const rows = MODELS.filter((m) => data[m.key]).map((m) => {
+    const d = data[m.key], r = rollout(d);
+    const real = d.tokens.map((t, i) => ({ t, i, v: r[i] })).filter((x) => !x.t.special);
+    const wordy = real.reduce((s, x) => s + x.t.t.replace(/^##/, "").length, 0) / Math.max(1, real.length) >= 2;
+    const top = wordy ? real.slice().sort((a, b) => b.v - a.v).slice(0, 3).map((x) => x.t.t.replace(/^##/, "")) : [];
+    return h("div", { class: "tokrow" },
+      h("div", { class: "head" }, modelLabel(m), h("span", { class: `badge ${d.label}` }, d.label), h("span", { class: "num" }, `${(d.scores[d.label] * 100).toFixed(0)}%`),
+        top.length ? h("span", { class: "muted" }, "most weight: ", top.join(", ")) : h("span", { class: "muted" }, "single characters: no one token stands out")),
+      shadedTokens(d, r, { color: m.color }));
+  });
+  return h("div", { class: "box" }, h("div", { class: "box-head" }, h("h3", {}, "What feeds the [CLS] vector")),
+    h("p", { class: "note", style: "max-width:68ch" }, "The classifier reads only the [CLS] position. Attention rollout follows [CLS] back through every layer (mean over heads, residual connection included), so darker tokens contributed more to the final decision."), ...rows);
+}
+
+function heatmap(d, W, q, onpick) {
+  const n = d.tokens.length, cs = Math.max(4, Math.min(22, Math.floor(540 / n))), lab = cs >= 11;
+  const left = lab ? 84 : 6, top = lab ? 84 : 6, S = n * cs;
+  const parts = [`<rect x="${left}" y="${top}" width="${S}" height="${S}" fill="var(--panel-2)"/>`];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const o = Math.min(1, Math.sqrt(W[i][j]));
+    if (o > 0.04) parts.push(`<rect x="${left + j * cs}" y="${top + i * cs}" width="${cs}" height="${cs}" fill="var(--accent)" fill-opacity="${o.toFixed(2)}"/>`);
+  }
+  parts.push(`<rect x="${left - 0.5}" y="${top + q * cs - 0.5}" width="${S + 1}" height="${cs + 1}" fill="none" stroke="var(--red)" stroke-width="1.5"/>`);
+  if (lab) d.tokens.forEach((t, i) => {
+    const s = (t.t.length > 9 ? t.t.slice(0, 8) + "…" : t.t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    parts.push(`<text x="${left - 6}" y="${top + i * cs + cs / 2 + 4}" text-anchor="end" class="hl${i === q ? " on" : ""}">${s}</text>`);
+    parts.push(`<text transform="translate(${left + i * cs + cs / 2 + 4},${top - 6}) rotate(-90)" class="hl">${s}</text>`);
+  });
+  const svg = h("div", { class: "hm" });
+  svg.innerHTML = `<svg viewBox="0 0 ${left + S + 6} ${top + S + 6}" role="img" aria-label="Attention matrix, ${n} by ${n} tokens. Rows are the token looking, columns the token looked at." style="width:${Math.min(left + S + 6, 640)}px">${parts.join("")}</svg>`;
+  const el = svg.firstChild;
+  const cell = (e) => { const r = el.getBoundingClientRect(), k = r.width / el.viewBox.baseVal.width; const x = (e.clientX - r.left) / k - left, y = (e.clientY - r.top) / k - top; const i = Math.floor(y / cs), j = Math.floor(x / cs); return i >= 0 && j >= 0 && i < n && j < n ? [i, j] : null; };
+  el.addEventListener("mousemove", (e) => { const c = cell(e); if (!c) return hideTip(); showTip([`${d.tokens[c[0]].t}  →  ${d.tokens[c[1]].t}  ·  ${W[c[0]][c[1]].toFixed(3)}`], e.clientX, e.clientY); });
+  el.addEventListener("mouseleave", hideTip);
+  el.addEventListener("click", (e) => { const c = cell(e); if (c) onpick(c[0]); });
+  return svg;
+}
+
+function insideBox() {
+  const m = MODELS.find((x) => x.key === att.key), d = att.data[att.key];
+  if (att.layer == null || att.layer >= d.layers) att.layer = d.layers - 1;
+  if (att.head >= d.heads) att.head = -1;
+  if (att.q >= d.tokens.length) att.q = 0;
+  const box = h("div", { class: "box" });
+  const seg = (items, cur, pick, label) => h("div", { class: "seg", role: "group", "aria-label": label }, items.map(([v, t]) => h("button", { type: "button", "aria-pressed": v === cur, onclick: () => pick(v) }, t)));
+  const redraw = () => { hideTip(); box.replaceWith(insideBox()); };
+  const W = weights(d, att.layer, att.head), row = W[att.q];
+  const q = d.tokens[att.q];
+  box.append(
+    h("div", { class: "box-head" }, h("h3", {}, "Look inside one model"), seg(MODELS.filter((x) => att.data[x.key]).map((x) => [x.key, x.short]), att.key, (v) => { att.key = v; att.q = 0; redraw(); }, "Model")),
+    h("div", { class: "ctl" }, h("span", { class: "muted" }, "Layer"), seg(Array.from({ length: d.layers }, (_, i) => [i, String(i + 1)]), att.layer, (v) => { att.layer = v; redraw(); }, "Layer")),
+    h("div", { class: "ctl" }, h("span", { class: "muted" }, "Head"), seg([[-1, "mean"], ...Array.from({ length: d.heads }, (_, i) => [i, String(i + 1)])], att.head, (v) => { att.head = v; redraw(); }, "Head")),
+    h("p", { class: "note", style: "max-width:70ch;margin-top:14px" }, "Pick the token that is looking. The tokens below are shaded by how much attention it gives each one (",
+      h("b", {}, `${q.t}`), `, layer ${att.layer + 1}, ${att.head < 0 ? "mean of " + d.heads + " heads" : "head " + (att.head + 1)}). The [CLS] token (first) is the one the classifier reads.`),
+    shadedTokens(d, row, { color: m.color, onpick: (i) => { att.q = i; redraw(); }, sel: att.q }),
+    h("div", { class: "hm-wrap" }, heatmap(d, W, att.q, (i) => { att.q = i; redraw(); }),
+      h("p", { class: "axis-note" }, "Rows: the token that looks. Columns: the token it looks at. Each row sums to 1; colour is √weight. Click a row to select it, hover a cell for the value.")));
+  return box;
+}
+
+function renderAttention(root) {
+  root.replaceChildren();
+  const out = h("div");
+  const err = h("div", { class: "err", role: "alert" });
+  const run = async (text, btn) => {
+    if (!text.trim()) return;
+    btn.disabled = true; err.textContent = ""; err.classList.remove("info");
+    const slow = setTimeout(() => { err.classList.add("info"); err.textContent = "Loading the models. The first request takes a few seconds…"; }, 600);
+    try {
+      att.data = await api("/api/attention", text); att.text = text; att.q = 0;
+      out.replaceChildren(summaryBox(att.data), insideBox());
+    } catch (e) { err.textContent = `Could not run attention: ${e.message}. Is serve.py running with trained models?`; }
+    clearTimeout(slow); if (err.textContent.startsWith("Loading the models")) err.textContent = ""; err.classList.remove("info");
+    btn.disabled = false;
+  };
+  const ib = inputBlock(run, "Type a tweet…", "Show attention");
+  root.append(h("h2", {}, "What the models look at"),
+    h("p", { class: "lede" }, "Self-attention lets every token read every other token. Each layer has several heads with their own weights. Here the real weights of the three saved models are shown for one tweet. Attention is a view into the model, not a proof of why it decided: heads can look at punctuation or [SEP] just to do nothing."),
+    ib.node, err, out);
+  run(examples()[0], ib.btn); ib.inp.value = examples()[0];
+}
+
 // ───────────────────────── Test set: three models side by side
 const view = { cell: null, mode: "all" };
 function agreementItems() {
@@ -379,7 +496,7 @@ function drawErrors() {
 function renderErrors() { drawErrors(); }
 
 // ───────────────────────── tabs
-const renderers = { compare: renderCompare, train: renderTrain, tokens: renderTokens, live: renderLive, errors: renderErrors };
+const renderers = { compare: renderCompare, train: renderTrain, tokens: renderTokens, attention: renderAttention, live: renderLive, errors: renderErrors };
 const rendered = new Set();
 function show(tab) {
   document.querySelectorAll(".tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
