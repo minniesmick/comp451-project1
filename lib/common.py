@@ -44,7 +44,14 @@ def seed_everything(seed):
 
 
 def get_device():
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    forced = os.environ.get("DEVICE")         # yerel ekleme: DEVICE=cpu | mps | cuda
+    if forced:
+        return torch.device(forced)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():     # Apple Silicon (yerel ekleme)
+        return torch.device("mps")
+    return torch.device("cpu")
 
 
 # ───────────────────────── bölme: Dataset1'in %85'i eğitim, %15'i doğrulama

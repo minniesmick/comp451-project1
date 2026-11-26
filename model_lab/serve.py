@@ -29,7 +29,7 @@ def _load_locked():
         return _cache
     from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
     import torch
-    device = 0 if torch.cuda.is_available() else -1
+    device = 0 if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else -1)   # mps: yerel ekleme
     for key, title in MODELS:
         path = os.path.join(ROOT, "models", key)
         if not os.path.isdir(path):

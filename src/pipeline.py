@@ -28,7 +28,7 @@ def main():
     model = AutoModelForSequenceClassification.from_pretrained(args.model_load_path)
     max_len = args.max_len or model.config.max_position_embeddings
     device = get_device()
-    clf = pipeline("text-classification", model=model, tokenizer=tokenizer, device=0 if device.type == "cuda" else -1)
+    clf = pipeline("text-classification", model=model, tokenizer=tokenizer, device=device)
 
     t0 = time.time()
     outs = clf([r["text"] for r in rows], batch_size=args.batch_size, truncation=True, max_length=min(max_len, 512), top_k=None)
