@@ -98,6 +98,7 @@ python tools/word2vec_baseline.py      # -> outputs/word2vec.json, CPU'da yakla�
 - `src/pipeline.py`, `top_k=None` ile `transformers.pipeline("text-classification")` kullanır.
 - JSON çıktısı örnek başına tahmin ve skorları, doğruluk, macro ve ağırlıklı F1'i, sınıf başına precision/recall/F1'i ve karışıklık matrisini (satırlar = gerçek etiket) içerir.
 - `tools/compare.py`, `outputs/summary.json` ve `outputs/summary.md` yazar.
+- `tools/benchmark.py` Model3 için aday taban modelleri aynı 250 tweet üzerinde eğitimsiz (zero-shot) değerlendirir; sonuçlar [report/benchmark.md](./report/benchmark.md) içinde.
 
 ### Model Lab (yerel görüntüleyici)
 - Compare sekmesi: üç modelin animasyonlu sıralaması.
