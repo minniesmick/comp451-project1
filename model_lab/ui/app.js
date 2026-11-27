@@ -34,6 +34,7 @@ const state = { summary: null, outs: {}, logs: {}, ready: false };
 async function load() {
   const tryJSON = (u) => getJSON(u).catch(() => null);
   state.summary = await tryJSON("/outputs/summary.json");
+  state.w2v = await tryJSON("/outputs/word2vec.json");     // optional extra: tools/word2vec_baseline.py
   for (const m of MODELS) {
     state.outs[m.key] = await tryJSON(`/outputs/${m.key}.json`);
     state.logs[m.key] = await tryJSON(`/models/${m.key}/train_log.json`);
@@ -136,11 +137,14 @@ function classPlot() {
 function metricsBox(stats) {
   const rows = [["Accuracy", (t) => t.accuracy], ["Macro-F1", (t) => t.macro_f1], ["Weighted-F1", (t) => t.weighted_f1]];
   const classRows = CLASSES.map((c) => [`${c} (n=${stats[0].t.per_class[c].support})`, (t) => t.per_class[c].f1]);
-  const tr = ([label, get]) => { const vals = stats.map((s) => get(s.t)), top = Math.max(...vals);
+  const base = state.w2v?.variants?.[state.w2v.chosen_by_validation]?.metrics;      // static Word2Vec baseline, if it was run
+  const cols = base ? [...stats, { t: base }] : stats;
+  const tr = ([label, get]) => { const vals = cols.map((s) => get(s.t)), top = Math.max(...vals);
     return h("tr", {}, h("td", { class: "k" }, label), vals.map((v) => h("td", { class: `n${v === top ? " best" : ""}` }, f2(v)))); };
-  const body = h("tbody", {}, rows.map(tr), h("tr", { class: "grp" }, h("td", { colspan: 4 }, "F1 per class")), classRows.map(tr));
-  const head = h("thead", {}, h("tr", {}, h("th"), MODELS.map((m) => h("th", { class: "mh" }, modelDot(m), m.short))));
-  return h("div", { class: "box", style: "margin-bottom:20px" }, h("h3", {}, "All metrics"), h("table", { class: "mt" }, head, body));
+  const body = h("tbody", {}, rows.map(tr), h("tr", { class: "grp" }, h("td", { colspan: cols.length + 1 }, "F1 per class")), classRows.map(tr));
+  const head = h("thead", {}, h("tr", {}, h("th"), MODELS.map((m) => h("th", { class: "mh" }, modelDot(m), m.short)), base ? h("th", { class: "mh" }, "Word2Vec") : null));
+  return h("div", { class: "box", style: "margin-bottom:20px" }, h("h3", {}, "All metrics"), h("table", { class: "mt" }, head, body),
+    base ? h("p", { class: "dot-note" }, "Word2Vec is the extra static-vector baseline (average word vector, small classifier); it is not one of the three assignment models.") : null);
 }
 
 // ───────────────────────── line chart helper

@@ -57,7 +57,14 @@ def main():
     picked.append(next(r for r in rows if r not in picked))
     examples = [{"text": r["text"], "label": r["label_name"], "tokens": {k: pieces(toks[k], r["text"], cfgs[k]) for k in KEYS}} for r in picked]
 
-    write_json(args.out, {"task": "tweet sentiment (TweetEval)", "data": stats, "models": models, "examples": examples})
+    data = {"task": "tweet sentiment (TweetEval)", "data": stats, "models": models, "examples": examples}
+    w2v_path = os.path.join(args.outputs_dir, "word2vec.json")
+    if os.path.exists(w2v_path):                      # ek taban çizgisi (tools/word2vec_baseline.py) koşulduysa
+        w = json.load(open(w2v_path, encoding="utf-8"))
+        data["baseline"] = {"chosen": w["chosen_by_validation"],
+                            "variants": {k: {"val_macro_f1": v["val_macro_f1"], "metrics": v["metrics"]} for k, v in w["variants"].items()},
+                            "neighbours": w["nearest_neighbours"], "context": w["same_word_two_sentences"]}
+    write_json(args.out, data)
     print(f"yazıldı: {args.out}")
 
 
