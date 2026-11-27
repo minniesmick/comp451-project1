@@ -10,3 +10,4 @@ data/*.jsonl
 PRODUCT.md
 report/report.html
 outputs/run.log
+outputs/bench/
