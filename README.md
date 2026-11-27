@@ -74,6 +74,19 @@ Dataset2 (250 held-out tweets):
 
 BPE beats character-level tokens by about 8 macro-F1 points. Model2 and Model3 are within noise of each other on 250 samples. Details are in [report/report.md](./report/report.md).
 
+## Extra: Word2Vec baseline
+
+Not part of the assignment flow (`run.sh` does not call it). It learns CBOW and Skip-Gram vectors from the training split, classifies the average word vector, picks the variant on validation and measures it on the same 250 tweets. It also prints nearest neighbours and an analogy, and compares one word in two sentences (static vs contextual vectors).
+
+```bash
+pip install -r requirements-extra.txt
+python tools/word2vec_baseline.py      # -> outputs/word2vec.json, about 3 minutes on CPU
+```
+
+| Model | Accuracy | Macro-F1 |
+|---|---|---|
+| Word2Vec Skip-Gram baseline | 0.644 | 0.611 |
+
 ## Features
 
 ### Training
@@ -225,6 +238,7 @@ python tools/make_zip.py --with_models    # also include trained weights; about 
 │   └── custom_tokenizers.py  # char and BPE tokenizer builders
 ├── tools/                # helper scripts
 │   ├── prepare_data.py       # download TweetEval, build Dataset1 / Dataset2
+│   ├── word2vec_baseline.py  # static-vector baseline (extra)
 │   ├── compare.py            # summary of the three models
 │   ├── export_app_data.py    # export results for the course study app
 │   └── make_zip.py           # build the submission zip

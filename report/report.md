@@ -29,6 +29,7 @@ Everything uses relative paths. Single steps and arguments (`--model_save_path -
 | Model 1 (char, scratch) | 0.636 | 0.618 | 0.638 | 0.520 | 0.655 | 0.678 |
 | Model 2 (BPE, scratch) | 0.704 | 0.700 | 0.705 | 0.673 | 0.700 | 0.728 |
 | Model 3 (DistilBERT, fine-tuned) | 0.708 | 0.695 | 0.709 | 0.608 | 0.697 | 0.780 |
+| Baseline (Word2Vec Skip-Gram) | 0.644 | 0.611 | 0.640 | 0.482 | 0.678 | 0.674 |
 
 ## Discussion
 
@@ -36,3 +37,7 @@ Everything uses relative paths. Single steps and arguments (`--model_save_path -
 - **A tiny BPE model nearly matches a 67 M pretrained model** (macro-F1 0.700 vs 0.695; accuracy 0.704 vs 0.708). With 250 test tweets, a difference of 0.006 is within noise (one tweet is 0.4 accuracy points), so we do not claim a winner between them.
 - **Model 3 is better on positive tweets** (F1 0.780 vs 0.728) but worse on negative ones (0.608 vs 0.673): its SST-2 prior is polarity-driven, and the neutral class does not exist in SST-2, so most errors are neutral confused with polarity (see confusion matrices in the output files).
 - **Limitations.** One seed, one split, small test set; hyper-parameters were not tuned per model. Neutral is the hardest class for all three.
+
+## Extra: static Word2Vec baseline
+
+`python tools/word2vec_baseline.py` (needs `requirements-extra.txt`; not part of `run.sh`). CBOW and Skip-Gram vectors (100-d, window 5) are learned from the training split only; a tweet is the average of its word vectors, classified by a small network. Skip-Gram was chosen on validation macro-F1 (0.591 vs 0.584); CBOW would have scored 0.619 on the test set. The baseline is level with Model 1 and 9 macro-F1 points below Model 2: averaging static vectors loses word order and context. Its nearest neighbour of *good* is *bad* (cosine 0.67), because opposites occur in the same contexts. In two different sentences *sick* gets one identical Word2Vec vector (cosine 1.0), while all three transformers give it different vectors (cosine -0.18 to 0.66; not comparable across models).

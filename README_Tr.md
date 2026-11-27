@@ -74,6 +74,19 @@ Dataset2 (ayrılmış 250 tweet):
 
 BPE, karakter düzeyine göre yaklaşık 8 macro-F1 puan öndedir. 250 örnekte Model2 ile Model3 arasındaki fark gürültü sınırındadır. Ayrıntılar [report/report.md](./report/report.md) içinde.
 
+## Ek: Word2Vec taban çizgisi
+
+Ödev akışının parçası değildir (`run.sh` çağırmaz). Eğitim bölümünden CBOW ve Skip-Gram vektörleri öğrenir, kelime vektörlerinin ortalamasını sınıflandırır, çeşidi doğrulama kümesinde seçer ve aynı 250 tweet'te ölçer. Ayrıca en yakın kelimeleri ve bir analojiyi gösterir, aynı kelimenin iki cümledeki vektörünü karşılaştırır (statik ve bağlamsal).
+
+```bash
+pip install -r requirements-extra.txt
+python tools/word2vec_baseline.py      # -> outputs/word2vec.json, CPU'da yaklaşık 3 dakika
+```
+
+| Model | Doğruluk | Macro-F1 |
+|---|---|---|
+| Word2Vec Skip-Gram taban çizgisi | 0,644 | 0,611 |
+
 ## Özellikler
 
 ### Eğitim
@@ -225,6 +238,7 @@ python tools/make_zip.py --with_models    # eğitilmiş ağırlıklar da dahil; 
 │   └── custom_tokenizers.py  # karakter ve BPE tokenizer kurucuları
 ├── tools/                # yardımcı betikler
 │   ├── prepare_data.py       # TweetEval indir, Dataset1 / Dataset2 üret
+│   ├── word2vec_baseline.py  # statik vektör taban çizgisi (ek)
 │   ├── compare.py            # üç modelin özeti
 │   ├── export_app_data.py    # sonuçları ders çalışma uygulaması için dışa aktar
 │   └── make_zip.py           # teslim zip'ini üret

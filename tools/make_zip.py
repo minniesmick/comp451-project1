@@ -5,7 +5,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import sys
 WITH_MODELS = "--with_models" in sys.argv          # kayıtlı model ağırlıklarını da koy (~270 MB)
-SKIP_DIRS = {".venv", "__pycache__", ".git", ".cache", ".claude"} | (set() if WITH_MODELS else {"models"})
+SKIP_DIRS = {".venv", "__pycache__", ".git", ".cache", ".claude", "word2vec"} | (set() if WITH_MODELS else {"models"})
 SKIP_FILES = {"run.log", "PRODUCT.md"}
 OUT = os.path.join(ROOT, "comp451_project1.zip")
 
