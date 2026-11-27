@@ -85,6 +85,7 @@ BPE beats character-level tokens by about 8 macro-F1 points. Model2 and Model3 a
 - `src/pipeline.py` uses `transformers.pipeline("text-classification")` with `top_k=None`.
 - JSON output holds per-sample predictions and scores, accuracy, macro and weighted F1, per-class precision/recall/F1 and the confusion matrix (rows = gold labels).
 - `tools/compare.py` writes `outputs/summary.json` and `outputs/summary.md`.
+- `tools/benchmark.py` scores candidate base checkpoints for Model3 zero-shot on the same 250 tweets (no training); results in [report/benchmark.md](./report/benchmark.md).
 
 ### Model Lab (local viewer)
 - Compare tab: animated ranking of the three models.
